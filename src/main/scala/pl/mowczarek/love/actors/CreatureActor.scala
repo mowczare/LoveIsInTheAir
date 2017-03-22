@@ -13,8 +13,11 @@ import scala.concurrent.ExecutionContext.Implicits.global
 /**
   * Created by neo on 15.03.17.
   */
-class CreatureActor(thisCreature: Creature, field: ActorRef, system: ActorSystem) extends Actor with ActorLogging {
+class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef, system: ActorSystem)
+  extends Actor
+    with ActorLogging {
 
+  private var thisCreature = thisCreatureInitialState
   private var pairedCreature: Option[Creature] = None
 
   override def preStart = {
@@ -30,7 +33,10 @@ class CreatureActor(thisCreature: Creature, field: ActorRef, system: ActorSystem
     case Accost(attributes) =>
       if (thisCreature.isAttractedTo(attributes))
         sender ! Interest(thisCreature)
-      else log.info("First creature not attracted")
+      else {
+        thisCreature = thisCreature.increaseDesperation
+        log.info(s"First creature not attracted")
+      }
 
     case Interest(otherCreature) =>
       if (thisCreature.isAttractedTo(otherCreature.attributes)) {

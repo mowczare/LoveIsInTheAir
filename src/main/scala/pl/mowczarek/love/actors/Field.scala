@@ -20,9 +20,9 @@ class Field(x: Int, y: Int, gameMap: ActorRef) extends Actor with ActorLogging {
       creatures += sender
       log.info(s"Creature landed on field ($x, $y)")
 
-    case Accost(attributes) =>
+    case command @ Accost(attributes) =>
       creatures.filter(_ != sender).foreach { creatureRef =>
-        creatureRef ! Accost(attributes)
+        creatureRef forward command
       }
   }
 }
