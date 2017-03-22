@@ -4,8 +4,6 @@ import akka.actor.ActorSystem
 import pl.mowczarek.love.actors.CreatureGenerator.StartGame
 import pl.mowczarek.love.actors.{CreatureGenerator, SystemMap}
 
-import scala.concurrent.Await
-
 /**
   * Created by neo on 15.03.17.
   */
