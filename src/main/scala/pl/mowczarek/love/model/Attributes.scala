@@ -11,9 +11,10 @@ case class Attributes(attributes: Map[String, Attribute]) {
   private val totalValue = attributes.values.map(at => at.value * at.importance).sum
 
   def areMatchedWith(otherAttributes: Attributes, desperation: Double): Boolean = {
-    attributes.map { case (name, myAttribute) =>
+    val points = attributes.map { case (name, myAttribute) =>
       otherAttributes.attributes.get(name).map(_.value).getOrElse(0) * myAttribute.importance
-    }.sum * desperation > totalValue
+    }.sum * desperation
+    points > totalValue
   }
 }
 

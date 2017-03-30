@@ -12,9 +12,12 @@ case class Creature(attributes: Attributes = Attributes.random,
                     preferences: Attributes = Attributes.random,
                     sex: Sex = Sex.random,
                     desperation: Double = 1.0) {
+
   def isAttractedTo(otherAttributes: Attributes): Boolean = {
     preferences.areMatchedWith(otherAttributes, desperation)
   }
+
+  def increaseDesperation = copy(desperation = this.desperation + 0.1)
 }
 
 object Sex {

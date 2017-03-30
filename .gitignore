@@ -1,0 +1,8 @@
+# Created by .ignore support plugin (hsz.mobi)
+.idea/
+conf/
+project/
+src/main/java/
+src/main/scala-2.12/
+src/test/
+target/
