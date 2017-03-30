@@ -31,7 +31,7 @@ libraryDependencies ++= akka ++ other
 
 fork in run := true
 
-mainClass in Compile := Some("pl.mowczarek.system.System")
+mainClass in Compile := Some("pl.mowczarek.love.System")
 
 resourceDirectory in Compile := baseDirectory.value / "conf"
 
