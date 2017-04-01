@@ -1,8 +1,8 @@
 package pl.mowczarek.love.actors
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import pl.mowczarek.love.actors.CreatureActor.{Accost, Migrate}
-import pl.mowczarek.love.actors.Field.{MigrateCreature, SpawnCreature}
+import pl.mowczarek.love.actors.CreatureActor.{Accost}
+import pl.mowczarek.love.actors.Field.{Emigrate, SpawnCreature, Immigrate}
 import pl.mowczarek.love.actors.SystemMap.GetRandomField
 import akka.pattern.ask
 import akka.util.Timeout
@@ -34,16 +34,16 @@ class Field(x: Int, y: Int, gameMap: ActorRef) extends Actor with ActorLogging {
         creatureRef forward command
       }
 
-    case command @ Migrate =>
+    case Emigrate =>
       (gameMap ? GetRandomField).mapTo[ActorRef].onComplete {
         case Failure(ex) => throw ex
         case Success(field: ActorRef) =>
           creatures -= sender
           log.info(s"Creature left field ($x, $y)")
-          field ! MigrateCreature(sender)
+          field ! Immigrate(sender)
       }
 
-    case MigrateCreature(creatureActor) =>
+    case Immigrate(creatureActor) =>
       creatures += creatureActor
       log.info(s"Creature migrated onto field ($x, $y)")
   }
@@ -51,7 +51,8 @@ class Field(x: Int, y: Int, gameMap: ActorRef) extends Actor with ActorLogging {
 
 object Field {
   case object SpawnCreature
-  case class MigrateCreature(creature: ActorRef)
+  case object Emigrate
+  case class Immigrate(creature: ActorRef)
   case class MoveCreature(dx: Int, dy: Int)
 
   def props(x: Int, y: Int, gameMap: ActorRef) = Props(new Field(x, y, gameMap))

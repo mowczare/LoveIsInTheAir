@@ -2,7 +2,7 @@ package pl.mowczarek.love.actors
 
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, PoisonPill, Props}
 import pl.mowczarek.love.actors.CreatureActor._
-import pl.mowczarek.love.actors.Field.SpawnCreature
+import pl.mowczarek.love.actors.Field.{Emigrate, SpawnCreature}
 import pl.mowczarek.love.model.Sex.Male
 import pl.mowczarek.love.model.{Attributes, Creature}
 
@@ -27,7 +27,7 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef, implici
     //TODO move adolescence time and tryToAccost time to config
     system.scheduler.scheduleOnce(15 seconds, self, Mature)
     system.scheduler.scheduleOnce(Random.nextInt(30)+50 seconds, self, Die)
-    system.scheduler.schedule(Random.nextInt(15) seconds, Random.nextInt(15) seconds, self, Migrate)
+    system.scheduler.schedule(Random.nextInt(15) + 10 seconds, Random.nextInt(15) + 10 seconds, self, Migrate)
   }
 
   override def receive: Receive = {
@@ -70,7 +70,7 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef, implici
       context.become(postPair)
 
     case Migrate =>
-      field ! Migrate
+      field ! Emigrate
       log.info("Creature is migrating")
   }
 
