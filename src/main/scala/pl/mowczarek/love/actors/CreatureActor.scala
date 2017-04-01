@@ -2,7 +2,7 @@ package pl.mowczarek.love.actors
 
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, PoisonPill, Props}
 import pl.mowczarek.love.actors.CreatureActor._
-import pl.mowczarek.love.actors.Field.SpawnCreature
+import pl.mowczarek.love.actors.Field.{Emigrate, SpawnCreature}
 import pl.mowczarek.love.model.Sex.Male
 import pl.mowczarek.love.model.{Attributes, Creature}
 
@@ -27,6 +27,7 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef, implici
     //TODO move adolescence time and tryToAccost time to config
     system.scheduler.scheduleOnce(15 seconds, self, Mature)
     system.scheduler.scheduleOnce(Random.nextInt(30)+50 seconds, self, Die)
+    system.scheduler.schedule(Random.nextInt(15) + 10 seconds, Random.nextInt(15) + 10 seconds, self, Migrate)
   }
 
   override def receive: Receive = {
@@ -67,6 +68,10 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef, implici
       pair(otherCreature)
       system.scheduler.schedule(2 seconds, 2 seconds, self, Copulate)
       context.become(postPair)
+
+    case Migrate =>
+      field ! Emigrate
+      log.info("Creature is migrating")
   }
 
   def postPair: Receive = {
@@ -89,6 +94,10 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef, implici
         log.info("Reproducing")
         system.actorOf(CreatureActor.props(field, thisCreature.mixWith(creature)))
       }
+
+    case Die =>
+      self ! PoisonPill
+      log.info("Creature is dead")
   }
 
   private def pair(otherCreature: Creature) = {
@@ -106,6 +115,7 @@ object CreatureActor {
   case object Copulate extends CreatureCommand
   case object Reproduce extends CreatureCommand
   case object Die extends CreatureCommand
+  case object Migrate extends CreatureCommand
 
 
   def props(field: ActorRef)(implicit system: ActorSystem): Props = props(field, Creature())
