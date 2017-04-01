@@ -18,6 +18,13 @@ case class Creature(attributes: Attributes = Attributes.random,
   }
 
   def increaseDesperation = copy(desperation = this.desperation + 0.1)
+
+  def mixWith(otherCreature: Creature) = {
+    Creature(
+      attributes.mixWith(otherCreature.attributes),
+      preferences.mixWith(otherCreature.preferences),
+      sex = Sex.random)
+  }
 }
 
 object Sex {
