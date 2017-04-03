@@ -1,29 +1,33 @@
-package pl.mowczarek.love.actors
+package pl.mowczarek.love.backend.actors
 
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, PoisonPill, Props}
-import pl.mowczarek.love.actors.CreatureActor._
-import pl.mowczarek.love.actors.Field.{Emigrate, SpawnCreature}
-import pl.mowczarek.love.model.Sex.Male
-import pl.mowczarek.love.model.{Attributes, Creature}
+import pl.mowczarek.love.backend.actors.CreatureActor._
+import pl.mowczarek.love.backend.actors.Field.{Emigrate, SpawnCreature}
+import pl.mowczarek.love.backend.model.Sex.Male
+import pl.mowczarek.love.backend.model.{Attributes, Creature}
+import akka.pattern.ask
+import akka.util.Timeout
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.Random
+import scala.util.{Failure, Random, Success}
 
 /**
   * Created by neo on 15.03.17.
   */
-class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef, implicit val system: ActorSystem)
-  extends Actor
-    with ActorLogging {
+class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef, implicit val system: ActorSystem) extends Actor
+  with ActorLogging {
 
+  implicit val timeout: Timeout = 5 seconds
+
+  private var thisField = field
   private var thisCreature = thisCreatureInitialState
   private var pairedCreature: Option[Creature] = None
 
   override def preStart = {
     log.info(s"${this.thisCreature} created in baby state")
-    field ! SpawnCreature
+    field ! SpawnCreature(thisCreature)
     //TODO move adolescence time and tryToAccost time to config
     system.scheduler.scheduleOnce(15 seconds, self, Mature)
     system.scheduler.scheduleOnce(Random.nextInt(30)+50 seconds, self, Die)
@@ -70,7 +74,10 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef, implici
       context.become(postPair)
 
     case Migrate =>
-      field ! Emigrate
+      (field ? Emigrate(thisCreature)).mapTo[ActorRef].onComplete {
+        case Success(ref) => thisField = ref
+        case Failure(ex) => throw ex
+      }
       log.info("Creature is migrating")
   }
 
@@ -106,7 +113,8 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef, implici
 }
 
 object CreatureActor {
-  sealed trait CreatureCommand
+
+  sealed trait CreatureCommand extends ActorCommand
   case object Mature extends CreatureCommand
   case object TryToAccost extends CreatureCommand
   case class Accost(attributes: Attributes) extends CreatureCommand
@@ -116,7 +124,6 @@ object CreatureActor {
   case object Reproduce extends CreatureCommand
   case object Die extends CreatureCommand
   case object Migrate extends CreatureCommand
-
 
   def props(field: ActorRef)(implicit system: ActorSystem): Props = props(field, Creature())
   def props(field: ActorRef, creature: Creature)(implicit system: ActorSystem): Props =

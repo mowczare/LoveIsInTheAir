@@ -1,4 +1,4 @@
-package pl.mowczarek.love.config
+package pl.mowczarek.love.backend.config
 
 import com.typesafe.config.ConfigFactory
 
@@ -10,4 +10,9 @@ object Config {
 
   val mapSize = conf.getInt("loveIsInTheAir.system.mapSize")
   val creaturesAtStart = conf.getInt("loveIsInTheAir.system.creaturesAtStart")
+
+  val batchSize = conf.getInt("loveIsInTheAir.system.websocket.batchSize")
+
+  val host = conf.getString("loveIsInTheAir.system.websocket.host")
+  val port = conf.getInt("loveIsInTheAir.system.websocket.port")
 }
