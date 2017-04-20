@@ -58,11 +58,10 @@ class Field(x: Int, y: Int, gameMap: ActorRef, sinkActor: ActorRef) extends Acto
 
     //This message comes from context.watch akka mechanism
     case Terminated(subject: ActorRef) =>
-      creatures -= subject
       creatures.get(subject).foreach { creature =>
         forwardToSocket(CreatureDied(creature, x, y))
       }
-
+      creatures -= subject
   }
 
   private def forwardToSocket(e: FieldEvent) = sinkActor ! e
