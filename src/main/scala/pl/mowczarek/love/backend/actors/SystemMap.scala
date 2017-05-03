@@ -1,7 +1,8 @@
 package pl.mowczarek.love.backend.actors
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
-import pl.mowczarek.love.backend.actors.SystemMap.GetRandomField
+import pl.mowczarek.love.backend.actors.CreatureManager.KillAllCreatures
+import pl.mowczarek.love.backend.actors.SystemMap.{GetField, GetRandomField}
 import pl.mowczarek.love.backend.config.Config
 
 import scala.util.Random
@@ -34,10 +35,20 @@ class SystemMap(sinkActor: ActorRef, system: ActorSystem) extends Actor {
     case GetRandomField(x, y) =>
       val potentialField = fieldsMap.get(Coordinates(x + Random.nextInt(3)-1, y + Random.nextInt(3)-1))
       potentialField.orElse(fieldsMap.get(Coordinates(x, y))).foreach(field => sender ! field)
+
+    case KillAllCreatures =>
+      fieldsMap.values.foreach(_ ! KillAllCreatures)
+
+    case GetField(coordinates) =>
+      fieldsMap.get(coordinates).foreach { field =>
+        sender ! field
+      }
   }
 }
 
 object SystemMap {
+
+  case class GetField(coordinates: Coordinates)
 
   case object GetRandomField
 

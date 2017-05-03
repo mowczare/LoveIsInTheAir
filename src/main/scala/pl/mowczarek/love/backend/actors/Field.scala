@@ -1,15 +1,17 @@
 package pl.mowczarek.love.backend.actors
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
+import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Props, Terminated}
 import akka.pattern.ask
 import akka.util.Timeout
-import pl.mowczarek.love.backend.actors.CreatureActor.Accost
+import pl.mowczarek.love.backend.actors.CreatureActor.{Accost, Die}
+import pl.mowczarek.love.backend.actors.CreatureManager.KillAllCreatures
 import pl.mowczarek.love.backend.actors.Field._
 import pl.mowczarek.love.backend.actors.SystemMap.GetRandomField
 import pl.mowczarek.love.backend.model.Creature
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.util.{Failure, Success}
 
 import upickle.default._
@@ -28,6 +30,10 @@ class Field(x: Int, y: Int, gameMap: ActorRef, sinkActor: ActorRef) extends Acto
   }
 
   override def receive: Receive = {
+
+    case KillAllCreatures =>
+      creatures.keys.foreach(_ ! Die)
+
     case c@SpawnCreature(creature) =>
       creatures += sender -> creature
       context.watch(sender)

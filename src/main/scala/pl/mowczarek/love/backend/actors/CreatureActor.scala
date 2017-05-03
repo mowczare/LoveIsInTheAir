@@ -16,7 +16,7 @@ import scala.util.{Failure, Random, Success}
 /**
   * Created by neo on 15.03.17.
   */
-class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef, implicit val system: ActorSystem) extends Actor
+class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef) extends Actor
   with ActorLogging {
 
   implicit val timeout: Timeout = 5 seconds
@@ -29,9 +29,9 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef, implici
     log.info(s"${this.thisCreature} created in baby state")
     field ! SpawnCreature(thisCreature)
     //TODO move adolescence time and tryToAccost time to config
-    system.scheduler.scheduleOnce(15 seconds, self, Mature)
-    system.scheduler.scheduleOnce(Random.nextInt(30)+50 seconds, self, Die)
-    system.scheduler.schedule(Random.nextInt(15) + 10 seconds, Random.nextInt(15) + 10 seconds, self, Migrate)
+    context.system.scheduler.scheduleOnce(15 seconds, self, Mature)
+    context.system.scheduler.scheduleOnce(Random.nextInt(30)+50 seconds, self, Die)
+    context.system.scheduler.schedule(Random.nextInt(15) + 10 seconds, Random.nextInt(15) + 10 seconds, self, Migrate)
   }
 
   override def receive: Receive = {
@@ -39,7 +39,7 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef, implici
       self ! PoisonPill
       log.info("Creature is dead")
     case Mature =>
-      if (thisCreature.sex == Male) system.scheduler.schedule(2 seconds, 2 seconds, self, TryToAccost)
+      if (thisCreature.sex == Male) context.system.scheduler.schedule(2 seconds, 2 seconds, self, TryToAccost)
       log.info("Creature is mature now")
       context.become(mature)
   }
@@ -70,7 +70,7 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef, implici
     case Match(otherCreature) =>
       log.info(s"Paired creature $thisCreature with $otherCreature")
       pair(otherCreature)
-      system.scheduler.schedule(2 seconds, 2 seconds, self, Copulate)
+      context.system.scheduler.schedule(2 seconds, 2 seconds, self, Copulate)
       context.become(postPair)
 
     case Migrate =>
@@ -86,7 +86,7 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef, implici
       log.info("Trying to copulate")
       if (Random.nextInt(100) < 20) {
         log.info("Pair is having a baby")
-        system.scheduler.scheduleOnce(1 second, self, Reproduce)
+        context.system.scheduler.scheduleOnce(1 second, self, Reproduce)
         context.become(pregnant)
       }
 
@@ -99,7 +99,7 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef, implici
     case Reproduce =>
       pairedCreature.foreach { creature =>
         log.info("Reproducing")
-        system.actorOf(CreatureActor.props(field, thisCreature.mixWith(creature)))
+        context.actorOf(CreatureActor.props(field, thisCreature.mixWith(creature)))
       }
 
     case Die =>
@@ -125,7 +125,7 @@ object CreatureActor {
   case object Die extends CreatureCommand
   case object Migrate extends CreatureCommand
 
-  def props(field: ActorRef)(implicit system: ActorSystem): Props = props(field, Creature())
-  def props(field: ActorRef, creature: Creature)(implicit system: ActorSystem): Props =
-    Props(new CreatureActor(creature, field, system))
+  def props(field: ActorRef): Props = props(field, Creature())
+  def props(field: ActorRef, creature: Creature): Props =
+    Props(new CreatureActor(creature, field))
 }
