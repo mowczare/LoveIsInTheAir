@@ -22,7 +22,8 @@ val other = Seq(
   "com.typesafe" % "config" % "1.3.1",
   "org.scalatest" %% "scalatest" % "3.0.1",
   "org.json4s" %% "json4s-jackson" % "3.5.0",
-  "org.mockito" % "mockito-core" % "1.9.5"
+  "org.mockito" % "mockito-core" % "1.9.5",
+  "com.lihaoyi" %% "upickle" % "0.4.4"
 )
 
 lazy val love = project in file(".")

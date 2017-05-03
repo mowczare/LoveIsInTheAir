@@ -14,17 +14,17 @@ class DispatcherActor extends Actor with ActorLogging {
   private var subscribers = Set.empty[ActorRef]
 
   override def receive: Receive = {
-    case ev: ActorEvent =>
-      dispatch(ev)
     case ClientJoined(subscriber) ⇒
       context.watch(subscriber)
       subscribers += subscriber
+    case ev: String =>
+      dispatch(ev)
     //TODO send full SystemMap with creatures
     case Terminated(sub) ⇒
       subscribers = subscribers.filterNot(_ == sub)
   }
 
-  private def dispatch(event: ActorEvent): Unit = subscribers.foreach(_ forward event)
+  private def dispatch(event: Any): Unit = subscribers.foreach(_ forward event)
 
 }
 

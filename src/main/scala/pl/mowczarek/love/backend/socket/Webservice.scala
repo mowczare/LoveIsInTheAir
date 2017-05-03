@@ -32,18 +32,18 @@ class Webservice(sinkActor: ActorRef)(implicit fm: Materializer, system: ActorSy
       }
       .via(dispatcherFlow) // ... and route them through the chatFlow ...
       .map {
-      case msg: ActorEvent ⇒
-        TextMessage.Strict(msg.toString) // ... TODO pack outgoing messages into WS JSON messages ...
+      case msg: String =>
+        TextMessage.Strict(msg)
     }
       .via(reportErrorsFlow) // ... then log any processing errors on stdin
 
-  private def dispatcherFlow: Flow[String, ActorEvent, Any] = {
+  private def dispatcherFlow: Flow[String, String, Any] = {
 
     // A source that will create a target ActorRef per
     // materialization where the chatActor will send its messages to.
     // This source will only buffer one element and will fail if the client doesn't read
     // messages fast enough.
-    val source = Source.actorRef[ActorEvent](Config.batchSize, OverflowStrategy.fail)
+    val source = Source.actorRef[String](Config.batchSize, OverflowStrategy.fail)
       .mapMaterializedValue(sinkActor ! ClientJoined(_))
 
     Flow.fromSinkAndSource(Sink.ignore, source)
