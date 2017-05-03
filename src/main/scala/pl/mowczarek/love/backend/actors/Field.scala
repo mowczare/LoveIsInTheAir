@@ -12,6 +12,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
+import upickle.default._
+
 /**
   * Created by neo on 22.03.17.
   */
@@ -30,7 +32,7 @@ class Field(x: Int, y: Int, gameMap: ActorRef, sinkActor: ActorRef) extends Acto
       creatures += sender -> creature
       context.watch(sender)
       log.info(s"Creature landed on field ($x, $y)")
-      forwardToSocket(c.toEvent(x,y))
+      forwardToSocket(write(c.toEvent(x,y)))
 
     case command @ Accost(attributes) =>
       creatures.keys.filter(_ != sender).foreach { creatureRef =>
@@ -47,25 +49,26 @@ class Field(x: Int, y: Int, gameMap: ActorRef, sinkActor: ActorRef) extends Acto
           log.info(s"Creature left field ($x, $y)")
           creatureRef ! field
           field forward Immigrate(creature)
-          forwardToSocket(c.toEvent(x,y))
+          forwardToSocket(write(c.toEvent(x,y)))
       }
 
     case c@Immigrate(creature) =>
       creatures += sender -> creature
       context.watch(sender)
       log.info(s"Creature migrated onto field ($x, $y)")
-      forwardToSocket(c.toEvent(x,y))
+      forwardToSocket(write(c.toEvent(x,y)))
 
     //This message comes from context.watch akka mechanism
     case Terminated(subject: ActorRef) =>
       creatures -= subject
       creatures.get(subject).foreach { creature =>
-        forwardToSocket(CreatureDied(creature, x, y))
+        forwardToSocket(write(CreatureDied(creature, x, y)))
       }
 
   }
 
-  private def forwardToSocket(e: FieldEvent) = sinkActor ! e
+
+  private def forwardToSocket(e: String) = sinkActor ! e
 
 }
 
