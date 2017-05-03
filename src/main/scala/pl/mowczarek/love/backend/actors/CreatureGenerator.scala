@@ -1,11 +1,11 @@
-package pl.mowczarek.love.actors
+package pl.mowczarek.love.backend.actors
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
-import pl.mowczarek.love.actors.CreatureGenerator.StartGame
-import pl.mowczarek.love.config.Config
+import pl.mowczarek.love.backend.actors.CreatureGenerator.StartGame
+import pl.mowczarek.love.backend.config.Config
 import akka.pattern.ask
 import akka.util.Timeout
-import pl.mowczarek.love.actors.SystemMap.GetRandomField
+import pl.mowczarek.love.backend.actors.SystemMap.GetRandomField
 
 import scala.util.{Failure, Success}
 import scala.concurrent.duration._
@@ -33,6 +33,7 @@ class CreatureGenerator(systemMap: ActorRef, implicit val system: ActorSystem) e
 }
 
 object CreatureGenerator {
+
   case object StartGame
 
   def props(systemMap: ActorRef)(implicit system: ActorSystem) = Props(new CreatureGenerator(systemMap, system))

@@ -1,6 +1,6 @@
-package pl.mowczarek.love.model
+package pl.mowczarek.love.backend.model
 
-import pl.mowczarek.love.model.Sex.Sex
+import pl.mowczarek.love.backend.model.Sex.Sex
 
 import java.util.UUID
 

@@ -1,4 +1,4 @@
-package pl.mowczarek.love.model
+package pl.mowczarek.love.backend.model
 
 import scala.language.postfixOps
 import scala.util.Random

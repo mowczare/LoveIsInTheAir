@@ -4,7 +4,6 @@ version := "1.0"
 
 scalaVersion := "2.12.1"
 
-
 val akkaVersion = "2.4.17"
 
 val akkaHttpVersion = "10.0.4"
@@ -15,6 +14,7 @@ val akka = Seq(
   "com.typesafe.akka" %% "akka-kernel" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
   "com.typesafe.akka" %% "akka-http-core" % akkaHttpVersion,
+  "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test"
 )
 
@@ -31,7 +31,7 @@ libraryDependencies ++= akka ++ other
 
 fork in run := true
 
-mainClass in Compile := Some("pl.mowczarek.love.System")
+mainClass in Compile := Some("pl.mowczarek.love.backend.LoveSystem")
 
 resourceDirectory in Compile := baseDirectory.value / "conf"
 
