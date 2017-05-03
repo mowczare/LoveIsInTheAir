@@ -1,5 +1,7 @@
 package pl.mowczarek.love.backend.model
 
+import java.util.UUID
+
 import pl.mowczarek.love.backend.model.Sex.Sex
 
 import scala.util.Random
@@ -11,7 +13,8 @@ import scala.util.Random
 case class Creature(attributes: Attributes = Attributes.random,
                     preferences: Attributes = Attributes.random,
                     sex: Sex = Sex.random,
-                    desperation: Double = 1.0) {
+                    desperation: Double = 1.0,
+                    id: String = UUID.randomUUID().toString) {
 
   def isAttractedTo(otherAttributes: Attributes): Boolean = {
     preferences.areMatchedWith(otherAttributes, desperation)
