@@ -2,6 +2,7 @@ package pl.mowczarek.love.backend.socket
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.{Directives, Route}
 import akka.stream.scaladsl.{Flow, Sink, Source}
@@ -31,11 +32,20 @@ class Webservice(sinkActor: ActorRef, creatureManager: ActorRef)(implicit fm: Ma
     pathEnd {
       delete {
         creatureManager ! KillAllCreatures
-        complete(StatusCodes.NoContent)
+        respondWithHeaders(RawHeader("Access-Control-Allow-Origin", "*"), RawHeader("Access-Control-Allow-Methods", "POST, DELETE, OPTIONS")) {
+          complete(StatusCodes.NoContent)
+        }
       } ~
       post {
         creatureManager ! AddRandomCreature
-        complete(StatusCodes.OK)
+        respondWithHeaders(RawHeader("Access-Control-Allow-Origin", "*"), RawHeader("Access-Control-Allow-Methods", "POST, DELETE, OPTIONS")) {
+          complete(StatusCodes.Created)
+        }
+      } ~
+      options {
+        respondWithHeaders(RawHeader("Access-Control-Allow-Origin", "*"), RawHeader("Access-Control-Allow-Methods","POST, DELETE, OPTIONS")) {
+          complete(StatusCodes.OK)
+        }
       }
       //TODO add rest serializer to Creature
       /*~
