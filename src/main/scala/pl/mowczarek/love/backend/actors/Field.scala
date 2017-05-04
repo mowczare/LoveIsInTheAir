@@ -13,7 +13,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
-
 import upickle.default._
 
 /**
@@ -47,6 +46,7 @@ class Field(x: Int, y: Int, gameMap: ActorRef, sinkActor: ActorRef) extends Acto
 
     case c@Emigrate(creature) =>
       val creatureRef = sender
+      forwardToSocket(write(c.toEvent(x,y)))
       (gameMap ? GetRandomField(x, y)).mapTo[ActorRef].onComplete {
         case Failure(ex) => throw ex
         case Success(field: ActorRef) =>
@@ -55,7 +55,6 @@ class Field(x: Int, y: Int, gameMap: ActorRef, sinkActor: ActorRef) extends Acto
           log.info(s"Creature left field ($x, $y)")
           creatureRef ! field
           field forward Immigrate(creature)
-          forwardToSocket(write(c.toEvent(x,y)))
       }
 
     case c@Immigrate(creature) =>
@@ -64,13 +63,16 @@ class Field(x: Int, y: Int, gameMap: ActorRef, sinkActor: ActorRef) extends Acto
       log.info(s"Creature migrated onto field ($x, $y)")
       forwardToSocket(write(c.toEvent(x,y)))
 
+    case c@MatureCreature(creature) =>
+      log.info(s"Creature matured on field ($x, $y)")
+      forwardToSocket(write(c.toEvent(x,y)))
+
     //This message comes from context.watch akka mechanism
     case Terminated(subject: ActorRef) =>
-      creatures -= subject
       creatures.get(subject).foreach { creature =>
         forwardToSocket(write(CreatureDied(creature, x, y)))
       }
-
+      creatures -= subject
   }
 
 
@@ -84,6 +86,9 @@ object Field {
   case class SpawnCreature(creature: Creature) extends FieldCommand {
     def toEvent(x: Int, y: Int) = CreatureSpawned(creature, x, y)
   }
+  case class MatureCreature(creature: Creature) extends FieldCommand {
+    def toEvent(x: Int, y: Int) = CreatureMature(creature, x, y)
+  }
   case class Emigrate(creature: Creature) extends FieldCommand {
     def toEvent(x: Int, y: Int) = CreatureEmigrated(creature, x, y)
   }
@@ -93,6 +98,7 @@ object Field {
 
   sealed trait FieldEvent extends ActorEvent
   case class CreatureSpawned(creature: Creature, x: Int, y: Int) extends FieldEvent
+  case class CreatureMature(creature: Creature, x: Int, y: Int) extends FieldEvent
   case class CreatureEmigrated(creature: Creature, x: Int, y: Int) extends FieldEvent
   case class CreatureImmigrated(creature: Creature, x: Int, y: Int) extends FieldEvent
   case class CreatureDied(creature: Creature, x: Int, y: Int) extends FieldEvent

@@ -1,8 +1,8 @@
 package pl.mowczarek.love.backend.actors
 
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, PoisonPill, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Props}
 import pl.mowczarek.love.backend.actors.CreatureActor._
-import pl.mowczarek.love.backend.actors.Field.{Emigrate, SpawnCreature}
+import pl.mowczarek.love.backend.actors.Field.{Emigrate, MatureCreature, SpawnCreature}
 import pl.mowczarek.love.backend.model.Sex.Male
 import pl.mowczarek.love.backend.model.{Attributes, Creature}
 import akka.pattern.ask
@@ -42,6 +42,7 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef) extends
       if (thisCreature.sex == Male) context.system.scheduler.schedule(2 seconds, 2 seconds, self, TryToAccost)
       log.info("Creature is mature now")
       context.become(mature)
+      field ! MatureCreature(thisCreature)
   }
 
   def mature: Receive = {
