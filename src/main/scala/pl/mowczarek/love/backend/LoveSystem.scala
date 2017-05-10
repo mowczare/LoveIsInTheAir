@@ -19,14 +19,14 @@ object LoveSystem extends App {
   import actorSystem.dispatcher
   implicit val materializer = ActorMaterializer()
 
-  val sinkActor: ActorRef = actorSystem.actorOf(Props(new DispatcherActor))
+  val sinkActor: ActorRef = actorSystem.actorOf(Props(new DispatcherActor), "sinkActor")
 
-  val systemMap = actorSystem.actorOf(SystemMap.props(sinkActor))
+  val systemMap = actorSystem.actorOf(SystemMap.props(sinkActor), "systemMap")
   Thread.sleep(2000) // wait for map to create TODO dont use thread sleep ffs
   val creatureManager = actorSystem.actorOf(CreatureManager.props(systemMap))
   creatureManager ! StartGame
 
-  val service = new Webservice(sinkActor, creatureManager)
+  val service = new Webservice(sinkActor, creatureManager, systemMap)
 
   val bindingFuture = Http().bindAndHandle(service.route, Config.host, Config.port)
   bindingFuture.onComplete {
