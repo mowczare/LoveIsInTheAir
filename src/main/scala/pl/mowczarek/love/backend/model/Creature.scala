@@ -12,7 +12,8 @@ case class Creature(attributes: Attributes,
                     preferences: Attributes,
                     sex: Sex,
                     desperation: Double,
-                    id: String) {
+                    id: String,
+                    var state: String) {
 
   def isAttractedTo(otherAttributes: Attributes): Boolean = {
     preferences.areMatchedWith(otherAttributes, desperation)
@@ -33,8 +34,9 @@ object Creature {
                preferences: Attributes = Attributes.random,
                sex: Sex = Sex.random,
                desperation: Double = 1.0,
-               id: String = UUID.randomUUID().toString): Creature = {
-    Creature(attributes, preferences, sex, desperation, id)
+               id: String = UUID.randomUUID().toString,
+               state: String = "spawned"): Creature = {
+    Creature(attributes, preferences, sex, desperation, id, state)
   }
 }
 

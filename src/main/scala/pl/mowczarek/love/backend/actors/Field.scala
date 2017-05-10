@@ -46,6 +46,7 @@ class Field(x: Int, y: Int, gameMap: ActorRef, sinkActor: ActorRef) extends Acto
 
     case c@Emigrate(creature) =>
       val creatureRef = sender
+      creature.state = "emigrated"
       forwardToSocket(write(c.toEvent(x,y)))
       (gameMap ? GetRandomField(x, y)).mapTo[ActorRef].onComplete {
         case Failure(ex) => throw ex
@@ -58,12 +59,14 @@ class Field(x: Int, y: Int, gameMap: ActorRef, sinkActor: ActorRef) extends Acto
       }
 
     case c@Immigrate(creature) =>
+      creature.state = "immigrated"
       creatures += sender -> creature
       context.watch(sender)
       log.info(s"Creature migrated onto field ($x, $y)")
       forwardToSocket(write(c.toEvent(x,y)))
 
     case c@MatureCreature(creature) =>
+      creature.state = "mature"
       log.info(s"Creature matured on field ($x, $y)")
       forwardToSocket(write(c.toEvent(x,y)))
 
@@ -73,6 +76,7 @@ class Field(x: Int, y: Int, gameMap: ActorRef, sinkActor: ActorRef) extends Acto
     //This message comes from context.watch akka mechanism
     case Terminated(subject: ActorRef) =>
       creatures.get(subject).foreach { creature =>
+        creature.state = "dead"
         forwardToSocket(write(CreatureDied(creature, x, y)))
       }
       creatures -= subject
