@@ -3,7 +3,7 @@ package pl.mowczarek.love.backend.actors
 import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Props}
 import pl.mowczarek.love.backend.actors.CreatureActor._
 import pl.mowczarek.love.backend.actors.Field.{Emigrate, MatureCreature, SpawnCreature}
-import pl.mowczarek.love.backend.model.Sex.Male
+import pl.mowczarek.love.backend.model.Male
 import pl.mowczarek.love.backend.model.{Attributes, Creature}
 import akka.pattern.ask
 import akka.util.Timeout
@@ -126,7 +126,7 @@ object CreatureActor {
   case object Die extends CreatureCommand
   case object Migrate extends CreatureCommand
 
-  def props(field: ActorRef): Props = props(field, Creature())
+  def props(field: ActorRef): Props = props(field, Creature.generate())
   def props(field: ActorRef, creature: Creature): Props =
     Props(new CreatureActor(creature, field))
 }
