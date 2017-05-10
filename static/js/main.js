@@ -102,6 +102,13 @@ $( document ).ready(function() {
 
     var sizeX, sizeY;
 
+    var countChart;
+
+    var livingCreatures = ["Living creatures"];
+    var livingCreaturesCount = 0;
+    var deadCreatures = ["Dead creatures"];
+    var deadCreaturesCount = 0;
+
     //BUTTON HANDLERS
     //--------------------------------------------------------
     $("#refreshButton").click(function () {
@@ -151,12 +158,17 @@ $( document ).ready(function() {
                         }
                         if(creature.state != "dead"){
                             creatures.push(new Creature(creature.id, sex, coordinates.x, coordinates.y, creature.state));
+                            livingCreaturesCount++;
                         } else {
                             creatures.push(new Creature(creature.id, sex, coordinates.x, coordinates.y, "finalized"));
+                            deadCreaturesCount++;
                         }
 
                     }
                 }
+                livingCreatures.push(livingCreaturesCount);
+                deadCreatures.push(deadCreaturesCount);
+                generateCountChart();
                 repaint();
             }
         });
@@ -179,6 +191,7 @@ $( document ).ready(function() {
                 $("#simulation-logs").prepend("Creature " + data.creature.id + " spawned.<br>");
                 var sex = data.creature.sex.$type.toString().includes(".Male") ? "male" : "female";
                 creatures.push(new Creature(data.creature.id, sex, data.x, data.y, data.creature.state));
+                livingCreaturesCount++;
                 repaint();
                 break;
             case "pl.mowczarek.love.backend.actors.Field.CreatureMature":
@@ -245,6 +258,8 @@ $( document ).ready(function() {
                     sex = data.creature.sex.$type.toString().includes(".Male") ? "male" : "female";
                     creatures.push(new Creature(data.creature.id, sex, data.x, data.y, data.creature.state));
                 }
+                livingCreaturesCount--;
+                deadCreaturesCount++;
                 repaint();
                 setTimeout(removeDeadCreatures, 3000);
                 break;
@@ -254,5 +269,32 @@ $( document ).ready(function() {
     exampleSocket.onclose = function (event) {
         console.log("Disconnected from server web socket.");
         $("#simulation-logs").prepend("Disconnected from server web socket.<br>");
+    };
+
+    //CHART HANDLERS
+    //---------------------------------------------------------
+
+    var generateCountChart = function() {
+        countChart = c3.generate({
+            bindto: '#chart',
+            data: {
+                columns: [
+                    livingCreatures,
+                    deadCreatures
+                ]
+            }
+        });
+        setInterval(redrawCountChart, 1000);
+    };
+
+    var redrawCountChart = function() {
+        livingCreatures.push(livingCreaturesCount);
+        deadCreatures.push(deadCreaturesCount);
+        countChart.load({
+            columns: [
+                livingCreatures,
+                deadCreatures
+            ]
+        });
     };
 });
