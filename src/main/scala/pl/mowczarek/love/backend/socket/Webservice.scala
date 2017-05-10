@@ -7,17 +7,25 @@ import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.{Directives, Route}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{Materializer, OverflowStrategy}
-import pl.mowczarek.love.backend.actors.ActorEvent
+import pl.mowczarek.love.backend.actors.{ActorEvent, MapState}
 import pl.mowczarek.love.backend.actors.CreatureManager.{AddCreature, AddRandomCreature, KillAllCreatures}
+import pl.mowczarek.love.backend.actors.SystemMap.GetMapStatus
 import pl.mowczarek.love.backend.config.Config
 import pl.mowczarek.love.backend.socket.DispatcherActor.ClientJoined
 
-import scala.util.Failure
+import scala.util.{Failure, Success}
+import akka.pattern.ask
+import akka.util.Timeout
+import upickle.default._
+
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 /**
   * Created by neo on 03.04.17.
   */
-class Webservice(sinkActor: ActorRef, creatureManager: ActorRef)(implicit fm: Materializer, system: ActorSystem) extends Directives {
+class Webservice(sinkActor: ActorRef, creatureManager: ActorRef, systemMap: ActorRef)
+                (implicit fm: Materializer, system: ActorSystem) extends Directives {
   import system.dispatcher
 
   def route: Route =
@@ -28,25 +36,37 @@ class Webservice(sinkActor: ActorRef, creatureManager: ActorRef)(implicit fm: Ma
       wsRoutes
     }
 
+  implicit val timeout: Timeout = 15 seconds
+
   private val restRoutes: Route =
     pathEnd {
       delete {
         creatureManager ! KillAllCreatures
-        respondWithHeaders(RawHeader("Access-Control-Allow-Origin", "*"), RawHeader("Access-Control-Allow-Methods", "POST, DELETE, OPTIONS")) {
+        respondWithHeaders(Webservice.defaultHeaders) {
           complete(StatusCodes.NoContent)
         }
       } ~
       post {
         creatureManager ! AddRandomCreature
-        respondWithHeaders(RawHeader("Access-Control-Allow-Origin", "*"), RawHeader("Access-Control-Allow-Methods", "POST, DELETE, OPTIONS")) {
+        respondWithHeaders(Webservice.defaultHeaders) {
           complete(StatusCodes.Created)
         }
       } ~
       options {
-        respondWithHeaders(RawHeader("Access-Control-Allow-Origin", "*"), RawHeader("Access-Control-Allow-Methods","POST, DELETE, OPTIONS")) {
+        respondWithHeaders(Webservice.defaultHeaders) {
           complete(StatusCodes.OK)
         }
+      } ~
+      get {
+        respondWithHeaders(Webservice.defaultHeaders) {
+          onComplete((systemMap ? GetMapStatus).mapTo[MapState]) {
+            case Success(state) => complete(write(state))
+            case Failure(ex) => throw ex
+          }
+        }
       }
+
+
       //TODO add rest serializer to Creature
       /*~
       put {
@@ -95,4 +115,9 @@ class Webservice(sinkActor: ActorRef, creatureManager: ActorRef)(implicit fm: Ma
           println(s"WS stream failed with $cause")
         case _ => // ignore regular completion
       })
+}
+
+
+object Webservice {
+  val defaultHeaders = List(RawHeader("Access-Control-Allow-Origin", "*"), RawHeader("Access-Control-Allow-Methods","POST, DELETE, OPTIONS"))
 }

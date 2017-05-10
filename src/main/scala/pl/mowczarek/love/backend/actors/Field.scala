@@ -67,6 +67,9 @@ class Field(x: Int, y: Int, gameMap: ActorRef, sinkActor: ActorRef) extends Acto
       log.info(s"Creature matured on field ($x, $y)")
       forwardToSocket(write(c.toEvent(x,y)))
 
+    case GetFieldStatus =>
+      sender ! creatures.values.toList
+
     //This message comes from context.watch akka mechanism
     case Terminated(subject: ActorRef) =>
       creatures.get(subject).foreach { creature =>
@@ -102,6 +105,8 @@ object Field {
   case class CreatureEmigrated(creature: Creature, x: Int, y: Int) extends FieldEvent
   case class CreatureImmigrated(creature: Creature, x: Int, y: Int) extends FieldEvent
   case class CreatureDied(creature: Creature, x: Int, y: Int) extends FieldEvent
+
+  case object GetFieldStatus
 
   def props(x: Int, y: Int, gameMap: ActorRef, sinkActor: ActorRef) = Props(new Field(x, y, gameMap, sinkActor))
 
