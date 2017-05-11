@@ -106,8 +106,6 @@ $( document ).ready(function() {
 
     var livingCreatures = ["Living creatures"];
     var livingCreaturesCount = 0;
-    var deadCreatures = ["Dead creatures"];
-    var deadCreaturesCount = 0;
 
     //BUTTON HANDLERS
     //--------------------------------------------------------
@@ -161,13 +159,11 @@ $( document ).ready(function() {
                             livingCreaturesCount++;
                         } else {
                             creatures.push(new Creature(creature.id, sex, coordinates.x, coordinates.y, "finalized"));
-                            deadCreaturesCount++;
                         }
 
                     }
                 }
                 livingCreatures.push(livingCreaturesCount);
-                deadCreatures.push(deadCreaturesCount);
                 generateCountChart();
                 repaint();
             }
@@ -259,7 +255,6 @@ $( document ).ready(function() {
                     creatures.push(new Creature(data.creature.id, sex, data.x, data.y, data.creature.state));
                 }
                 livingCreaturesCount--;
-                deadCreaturesCount++;
                 repaint();
                 setTimeout(removeDeadCreatures, 3000);
                 break;
@@ -279,8 +274,7 @@ $( document ).ready(function() {
             bindto: '#chart',
             data: {
                 columns: [
-                    livingCreatures,
-                    deadCreatures
+                    livingCreatures
                 ]
             }
         });
@@ -289,11 +283,9 @@ $( document ).ready(function() {
 
     var redrawCountChart = function() {
         livingCreatures.push(livingCreaturesCount);
-        deadCreatures.push(deadCreaturesCount);
         countChart.load({
             columns: [
-                livingCreatures,
-                deadCreatures
+                livingCreatures
             ]
         });
     };
