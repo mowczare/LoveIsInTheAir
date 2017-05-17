@@ -15,8 +15,9 @@ case class Creature(attributes: Attributes,
                     id: String,
                     var state: String) {
 
-  def isAttractedTo(otherAttributes: Attributes): Boolean = {
-    preferences.areMatchedWith(otherAttributes, desperation)
+  def isAttractedTo(otherAttributes: Attributes, sex: Sex): Boolean = {
+    //Please do not sue me for being homophobic, creatures of the same sex cannot reproduce, it is for simplicity sake.
+    this.preferences.areMatchedWith(otherAttributes, desperation) && this.sex != sex
   }
 
   def increaseDesperation = copy(desperation = this.desperation + 0.1)

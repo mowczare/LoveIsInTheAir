@@ -3,8 +3,7 @@ package pl.mowczarek.love.backend.actors
 import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Props}
 import pl.mowczarek.love.backend.actors.CreatureActor._
 import pl.mowczarek.love.backend.actors.Field.{Emigrate, MatureCreature, SpawnCreature}
-import pl.mowczarek.love.backend.model.Male
-import pl.mowczarek.love.backend.model.{Attributes, Creature}
+import pl.mowczarek.love.backend.model.{Attributes, Creature, Male, Sex}
 import akka.pattern.ask
 import akka.util.Timeout
 
@@ -39,7 +38,7 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef) extends
       self ! PoisonPill
       log.info("Creature is dead")
     case Mature =>
-      if (thisCreature.sex == Male) context.system.scheduler.schedule(2 seconds, 2 seconds, self, TryToAccost)
+      context.system.scheduler.schedule(2 seconds, 2 seconds, self, TryToAccost)
       log.info("Creature is mature now")
       context.become(mature)
       field ! MatureCreature(thisCreature)
@@ -51,10 +50,10 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef) extends
       log.info("Creature is dead")
 
     case TryToAccost =>
-      field ! Accost(thisCreature.attributes)
+      field ! Accost(thisCreature.attributes, thisCreature.sex)
 
-    case Accost(attributes) =>
-      if (thisCreature.isAttractedTo(attributes))
+    case Accost(attributes, sex) =>
+      if (thisCreature.isAttractedTo(attributes, sex))
         sender ! Interest(thisCreature)
       else {
         thisCreature = thisCreature.increaseDesperation
@@ -62,7 +61,7 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef) extends
       }
 
     case Interest(otherCreature) =>
-      if (thisCreature.isAttractedTo(otherCreature.attributes)) {
+      if (thisCreature.isAttractedTo(otherCreature.attributes, otherCreature.sex)) {
         pair(otherCreature)
         sender ! Match(thisCreature)
         context.become(postPair)
@@ -118,7 +117,7 @@ object CreatureActor {
   sealed trait CreatureCommand extends ActorCommand
   case object Mature extends CreatureCommand
   case object TryToAccost extends CreatureCommand
-  case class Accost(attributes: Attributes) extends CreatureCommand
+  case class Accost(attributes: Attributes, sex: Sex) extends CreatureCommand
   case class Interest(otherCreature: Creature) extends CreatureCommand
   case class Match(otherCreature: Creature) extends CreatureCommand
   case object Copulate extends CreatureCommand
