@@ -39,7 +39,7 @@ class Field(x: Int, y: Int, gameMap: ActorRef, sinkActor: ActorRef) extends Acto
       log.info(s"Creature landed on field ($x, $y)")
       forwardToSocket(write(c.toEvent(x,y)))
 
-    case command @ Accost(attributes) =>
+    case command @ Accost(attributes, sex) =>
       creatures.keys.filter(_ != sender).foreach { creatureRef =>
         creatureRef forward command
       }
@@ -51,17 +51,17 @@ class Field(x: Int, y: Int, gameMap: ActorRef, sinkActor: ActorRef) extends Acto
       (gameMap ? GetRandomField(x, y)).mapTo[ActorRef].onComplete {
         case Failure(ex) => throw ex
         case Success(field: ActorRef) =>
-          creatures -= sender
-          context.unwatch(sender)
+          creatures -= creatureRef
+          context.unwatch(creatureRef)
           log.info(s"Creature left field ($x, $y)")
           creatureRef ! field
-          field forward Immigrate(creature)
+          field ! Immigrate(creature, creatureRef)
       }
 
-    case c@Immigrate(creature) =>
+    case c@Immigrate(creature, creatureRef) =>
       creature.state = "immigrated"
-      creatures += sender -> creature
-      context.watch(sender)
+      creatures += creatureRef -> creature
+      context.watch(creatureRef)
       log.info(s"Creature migrated onto field ($x, $y)")
       forwardToSocket(write(c.toEvent(x,y)))
 
@@ -99,7 +99,7 @@ object Field {
   case class Emigrate(creature: Creature) extends FieldCommand {
     def toEvent(x: Int, y: Int) = CreatureEmigrated(creature, x, y)
   }
-  case class Immigrate(creature: Creature) extends FieldCommand {
+  case class Immigrate(creature: Creature, creatureRef: ActorRef) extends FieldCommand {
     def toEvent(x: Int, y: Int) = CreatureImmigrated(creature, x, y)
   }
 
