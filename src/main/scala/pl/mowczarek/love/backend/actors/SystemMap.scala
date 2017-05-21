@@ -1,6 +1,7 @@
 package pl.mowczarek.love.backend.actors
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, Kill, PoisonPill, Props}
+import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings}
 import pl.mowczarek.love.backend.actors.CreatureManager.KillAllCreatures
 import pl.mowczarek.love.backend.actors.Field.GetFieldStatus
 import pl.mowczarek.love.backend.actors.SystemMap.{GetField, GetMapStatus, GetRandomField}
@@ -10,6 +11,7 @@ import pl.mowczarek.love.backend.model.Creature
 import scala.util.{Failure, Random, Success}
 import akka.pattern.ask
 import akka.util.Timeout
+import pl.mowczarek.love.backend.socket.DispatcherActor
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -19,23 +21,13 @@ import scala.concurrent.Future
 /**
   * Created by neo on 22.03.17.
   */
-class SystemMap(sinkActor: ActorRef, system: ActorSystem) extends Actor {
+class SystemMap(sinkActor: ActorRef) extends Actor { // TODO Rewrite to use Field shard paths
 
   private var fieldsMap: Map[Coordinates, ActorRef] = Map()
 
   val mapSize = Config.mapSize
 
   implicit val timeout: Timeout = 15 seconds
-
-  override def preStart = {
-    for {
-      x <- 1 to mapSize
-      y <- 1 to mapSize
-    } yield {
-      val newField = system.actorOf(Field.props(x, y, self, sinkActor), s"field$x-$y")
-      fieldsMap += (Coordinates(x, y) -> newField)
-    }
-  }
 
   override def receive: Receive = {
     case GetRandomField =>
@@ -78,7 +70,13 @@ object SystemMap {
 
   case object GetMapStatus
 
-  def props(sinkActor: ActorRef)(implicit system: ActorSystem) = Props(new SystemMap(sinkActor, system))
+  def props(sinkActor: ActorRef): Props = Props(new SystemMap(sinkActor))
+
+  def clusterSingletonProps(sinkActor: ActorRef)(implicit system: ActorSystem): Props =
+    ClusterSingletonManager.props(
+    singletonProps = props(sinkActor),
+    terminationMessage = PoisonPill,
+    settings = ClusterSingletonManagerSettings(system).withRole("worker"))
 }
 
 case class Coordinates(x: Int, y: Int)
@@ -86,3 +84,4 @@ case class Coordinates(x: Int, y: Int)
 case class FieldState(coordinates: Coordinates, creatures: List[Creature])
 
 case class MapState(sizeX: Int, sizeY: Int, states: List[FieldState])
+

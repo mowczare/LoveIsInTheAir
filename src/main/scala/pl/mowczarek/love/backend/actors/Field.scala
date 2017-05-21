@@ -1,34 +1,40 @@
 package pl.mowczarek.love.backend.actors
 
-import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Props, Terminated}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, Terminated}
+import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings, ShardRegion}
 import akka.pattern.ask
 import akka.util.Timeout
 import pl.mowczarek.love.backend.actors.CreatureActor.{Accost, Die}
 import pl.mowczarek.love.backend.actors.CreatureManager.KillAllCreatures
 import pl.mowczarek.love.backend.actors.Field._
 import pl.mowczarek.love.backend.actors.SystemMap.GetRandomField
+import pl.mowczarek.love.backend.config.Config
 import pl.mowczarek.love.backend.model.Creature
+import upickle.default._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
-import upickle.default._
 
 /**
   * Created by neo on 22.03.17.
   */
-class Field(x: Int, y: Int, gameMap: ActorRef, sinkActor: ActorRef) extends Actor with ActorLogging {
+class Field(gameMap: ActorRef, sinkActor: ActorRef) extends Actor with ActorLogging {
 
   private var creatures: Map[ActorRef, Creature] = Map()
 
   implicit val timeout: Timeout = 5 seconds
 
-  override def preStart = {
-    log.info(s"Field created: x: $x, y: $y")
+  override def receive: Receive = {
+    case CreateField(x: Int, y: Int) =>
+      log.info(s"Field created: x: $x, y: $y")
+      context.become(postCreate(x, y))
+
+    case msg => log.error("Got Field command not in created state: {}", msg)
   }
 
-  override def receive: Receive = {
+  def postCreate(x: Int, y: Int): Receive = {
 
     case KillAllCreatures =>
       creatures.keys.foreach(_ ! Die)
@@ -102,16 +108,41 @@ object Field {
   case class Immigrate(creature: Creature, creatureRef: ActorRef) extends FieldCommand {
     def toEvent(x: Int, y: Int) = CreatureImmigrated(creature, x, y)
   }
+  case class CreateField(x: Int, y: Int) extends FieldCommand {
+    def toEvent(x: Int, y: Int) = FieldCreated(x, y)
+  }
 
-  sealed trait FieldEvent extends ActorEvent
+  sealed trait FieldEvent extends ActorEvent {
+    def x: Int
+    def y: Int
+  }
+
   case class CreatureSpawned(creature: Creature, x: Int, y: Int) extends FieldEvent
   case class CreatureMature(creature: Creature, x: Int, y: Int) extends FieldEvent
   case class CreatureEmigrated(creature: Creature, x: Int, y: Int) extends FieldEvent
   case class CreatureImmigrated(creature: Creature, x: Int, y: Int) extends FieldEvent
   case class CreatureDied(creature: Creature, x: Int, y: Int) extends FieldEvent
+  case class FieldCreated(x: Int, y: Int) extends FieldEvent
 
   case object GetFieldStatus
 
-  def props(x: Int, y: Int, gameMap: ActorRef, sinkActor: ActorRef) = Props(new Field(x, y, gameMap, sinkActor))
+  def props(gameMap: ActorRef, sinkActor: ActorRef) = Props(new Field(gameMap, sinkActor))
+
+  def clusterShardingProps(gameMap: ActorRef, sinkActor: ActorRef)(implicit actorSystem: ActorSystem) =
+    ClusterSharding(actorSystem).start(
+      typeName = "Field",
+      entityProps = props(gameMap, sinkActor),
+      settings = ClusterShardingSettings(actorSystem),
+      extractEntityId = extractEntityId,
+      extractShardId = extractShardId
+    )
+
+  private val extractEntityId: ShardRegion.ExtractEntityId = {
+    case a: FieldEvent => (s"${a.x},${a.y}", a)
+  }
+
+  private val extractShardId: ShardRegion.ExtractShardId = {
+    case a: FieldEvent => (s"${a.x},${a.y}".hashCode % Config.numberOfShards).toString
+  }
 
 }

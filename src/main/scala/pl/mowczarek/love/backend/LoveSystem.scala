@@ -1,10 +1,11 @@
 package pl.mowczarek.love.backend
 
 import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import pl.mowczarek.love.backend.actors.CreatureManager.StartGame
-import pl.mowczarek.love.backend.actors.{CreatureManager, SystemMap}
+import pl.mowczarek.love.backend.actors.{CreatureManager, Field, SystemMap}
 import pl.mowczarek.love.backend.config.Config
 import pl.mowczarek.love.backend.socket.{DispatcherActor, Webservice}
 
@@ -19,14 +20,16 @@ object LoveSystem extends App {
   import actorSystem.dispatcher
   implicit val materializer = ActorMaterializer()
 
-  val sinkActor: ActorRef = actorSystem.actorOf(Props(new DispatcherActor), "sinkActor")
+  val sinkActor: ActorRef = actorSystem.actorOf(DispatcherActor.clusterSingletonProps, "sinkActor")
 
-  val systemMap = actorSystem.actorOf(SystemMap.props(sinkActor), "systemMap")
-  Thread.sleep(2000) // wait for map to create TODO dont use thread sleep ffs
-  val creatureManager = actorSystem.actorOf(CreatureManager.props(systemMap))
-  creatureManager ! StartGame
+  val systemMap = actorSystem.actorOf(SystemMap.clusterSingletonProps(sinkActor), "systemMap")
 
-  val service = new Webservice(sinkActor, creatureManager, systemMap)
+  val fieldsRegion: ActorRef = Field.clusterShardingProps(systemMap, sinkActor)
+
+  val creatureManager = actorSystem.actorOf(CreatureManager.props(systemMap)) // TODO Merge with systemMap
+  creatureManager ! StartGame   // TODO send with init in rest
+
+  val service = new Webservice(sinkActor, creatureManager, systemMap) // TODO Move with binding to sinkActor
 
   val bindingFuture = Http().bindAndHandle(service.route, Config.host, Config.port)
   bindingFuture.onComplete {
