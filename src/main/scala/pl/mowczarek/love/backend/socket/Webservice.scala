@@ -24,7 +24,7 @@ import scala.language.postfixOps
 /**
   * Created by neo on 03.04.17.
   */
-class Webservice(sinkActor: ActorRef, creatureManager: ActorRef, systemMap: ActorRef)
+class Webservice(sinkActor: ActorRef, creatureManager: ActorRef, systemMap: ActorRef) // TODO implement initialize backend endpoint
                 (implicit fm: Materializer, system: ActorSystem) extends Directives {
   import system.dispatcher
 

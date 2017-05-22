@@ -101,6 +101,8 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef) extends
         log.info("Reproducing")
         context.actorOf(CreatureActor.props(field, thisCreature.mixWith(creature)))
       }
+      context.system.scheduler.schedule(2 seconds, 2 seconds, self, Copulate)
+      context.become(postPair)
 
     case Die =>
       self ! PoisonPill

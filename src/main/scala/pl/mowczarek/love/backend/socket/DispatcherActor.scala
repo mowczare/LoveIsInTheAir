@@ -5,6 +5,7 @@ package pl.mowczarek.love.backend.socket
   */
 
 import akka.actor._
+import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings}
 import pl.mowczarek.love.backend.actors.ActorEvent
 import pl.mowczarek.love.backend.socket.DispatcherActor.ClientJoined
 
@@ -19,7 +20,6 @@ class DispatcherActor extends Actor with ActorLogging {
       subscribers += subscriber
     case ev: String =>
       dispatch(ev)
-    //TODO send full SystemMap with creatures
     case Terminated(sub) ⇒
       subscribers = subscribers.filterNot(_ == sub)
   }
@@ -29,6 +29,15 @@ class DispatcherActor extends Actor with ActorLogging {
 }
 
 object DispatcherActor {
+
+  def props = Props(new DispatcherActor)
+
+  def clusterSingletonProps(implicit system: ActorSystem): Props =
+    ClusterSingletonManager.props(
+      singletonProps = props,
+      terminationMessage = PoisonPill,
+      settings = ClusterSingletonManagerSettings(system).withRole("worker"))
+
   sealed trait FrontendEvent
   case class ClientJoined(subscriber: ActorRef) extends FrontendEvent
 }
