@@ -2,81 +2,78 @@ package pl.mowczarek.love.backend.actors
 
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, Terminated}
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings, ShardRegion}
-import akka.pattern.ask
 import akka.util.Timeout
-import pl.mowczarek.love.backend.actors.CreatureActor.{Accost, Die}
-import pl.mowczarek.love.backend.actors.CreatureManager.KillAllCreatures
+import pl.mowczarek.love.backend.actors.CreatureActor.Die
 import pl.mowczarek.love.backend.actors.Field._
-import pl.mowczarek.love.backend.actors.SystemMap.GetRandomField
 import pl.mowczarek.love.backend.config.Config
-import pl.mowczarek.love.backend.model.Creature
+import pl.mowczarek.love.backend.model.{Attributes, Creature, Sex}
 import upickle.default._
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.{Failure, Success}
 
 /**
   * Created by neo on 22.03.17.
   */
-class Field(gameMap: ActorRef, sinkActor: ActorRef) extends Actor with ActorLogging {
+class Field extends Actor with ActorLogging {
+
+  import Paths._
 
   private var creatures: Map[ActorRef, Creature] = Map()
+
+  implicit val system = context.system
 
   implicit val timeout: Timeout = 5 seconds
 
   override def receive: Receive = {
-    case CreateField(x: Int, y: Int) =>
-      log.info(s"Field created: x: $x, y: $y")
-      context.become(postCreate(x, y))
+    case CreateField(coordinates: Coordinates) =>
+      log.info(s"Field created: x: ${coordinates.x}, y: ${coordinates.y}")
+      context.become(postCreate(coordinates.x, coordinates.y))
 
     case msg => log.error("Got Field command not in created state: {}", msg)
   }
 
   def postCreate(x: Int, y: Int): Receive = {
 
-    case KillAllCreatures =>
+    case KillAllCreatures(_) =>
       creatures.keys.foreach(_ ! Die)
 
-    case c@SpawnCreature(creature) =>
-      creatures += sender -> creature
-      context.watch(sender)
+    case c@SpawnCreature(creature, _) =>
+      val newCreature = context.actorOf(CreatureActor.props(Coordinates(x, y), creature))
+      creatures += newCreature -> creature
+      context.watch(newCreature)
       log.info(s"Creature landed on field ($x, $y)")
-      forwardToSocket(write(c.toEvent(x,y)))
+      forwardToSocket(write(c.toEvent))
 
-    case command @ Accost(attributes, sex) =>
+    case command @ Accost(attributes, sex, _) =>
       creatures.keys.filter(_ != sender).foreach { creatureRef =>
         creatureRef forward command
       }
 
-    case c@Emigrate(creature) =>
+    case c@Emigrate(creature, coordinates) =>
       val creatureRef = sender
       creature.state = "emigrated"
-      forwardToSocket(write(c.toEvent(x,y)))
-      (gameMap ? GetRandomField(x, y)).mapTo[ActorRef].onComplete {
-        case Failure(ex) => throw ex
-        case Success(field: ActorRef) =>
-          creatures -= creatureRef
-          context.unwatch(creatureRef)
-          log.info(s"Creature left field ($x, $y)")
-          creatureRef ! field
-          field ! Immigrate(creature, creatureRef)
-      }
+      forwardToSocket(write(c.toEvent))
+      val randomNeighbour = Coordinates(x, y).randomNeighbor
+      creatures -= creatureRef
+      context.unwatch(creatureRef)
+      log.info(s"Creature left field ($x, $y)")
+      creatureRef ! randomNeighbour
+      fieldsPath ! Immigrate(creature, creatureRef, randomNeighbour)
 
-    case c@Immigrate(creature, creatureRef) =>
+    case c@Immigrate(creature, creatureRef, _) =>
       creature.state = "immigrated"
       creatures += creatureRef -> creature
       context.watch(creatureRef)
       log.info(s"Creature migrated onto field ($x, $y)")
-      forwardToSocket(write(c.toEvent(x,y)))
+      forwardToSocket(write(c.toEvent))
 
-    case c@MatureCreature(creature) =>
+    case c@MatureCreature(creature, _) =>
       creature.state = "mature"
       log.info(s"Creature matured on field ($x, $y)")
-      forwardToSocket(write(c.toEvent(x,y)))
+      forwardToSocket(write(c.toEvent))
 
-    case GetFieldStatus =>
+    case GetFieldStatus(_) =>
       sender ! creatures.values.toList
 
     //This message comes from context.watch akka mechanism
@@ -95,21 +92,30 @@ class Field(gameMap: ActorRef, sinkActor: ActorRef) extends Actor with ActorLogg
 
 object Field {
 
-  sealed trait FieldCommand extends ActorCommand
-  case class SpawnCreature(creature: Creature) extends FieldCommand {
-    def toEvent(x: Int, y: Int) = CreatureSpawned(creature, x, y)
+  sealed trait FieldCommand extends ActorCommand {
+    def coordinates: Coordinates
   }
-  case class MatureCreature(creature: Creature) extends FieldCommand {
-    def toEvent(x: Int, y: Int) = CreatureMature(creature, x, y)
+
+  case class SpawnCreature(creature: Creature, coordinates: Coordinates) extends FieldCommand {
+    def toEvent = CreatureSpawned(creature, coordinates.x, coordinates.y)
   }
-  case class Emigrate(creature: Creature) extends FieldCommand {
-    def toEvent(x: Int, y: Int) = CreatureEmigrated(creature, x, y)
+  case class MatureCreature(creature: Creature, coordinates: Coordinates) extends FieldCommand {
+    def toEvent = CreatureMature(creature, coordinates.x, coordinates.y)
   }
-  case class Immigrate(creature: Creature, creatureRef: ActorRef) extends FieldCommand {
-    def toEvent(x: Int, y: Int) = CreatureImmigrated(creature, x, y)
+  case class Emigrate(creature: Creature, coordinates: Coordinates) extends FieldCommand {
+    def toEvent = CreatureEmigrated(creature, coordinates.x, coordinates.y)
   }
-  case class CreateField(x: Int, y: Int) extends FieldCommand {
-    def toEvent(x: Int, y: Int) = FieldCreated(x, y)
+  case class Immigrate(creature: Creature, creatureRef: ActorRef, coordinates: Coordinates) extends FieldCommand {
+    def toEvent = CreatureImmigrated(creature, coordinates.x, coordinates.y)
+  }
+  case class CreateField(coordinates: Coordinates) extends FieldCommand {
+    def toEvent = FieldCreated(coordinates.x, coordinates.y)
+  }
+  case class Accost(attributes: Attributes, sex: Sex, coordinates: Coordinates) extends FieldCommand {
+    def toEvent = Accosted(attributes, sex, coordinates.x, coordinates.y)
+  }
+  case class KillAllCreatures(coordinates: Coordinates) extends FieldCommand {
+    def toEvent = AllCreaturesKilled(coordinates.x, coordinates.y)
   }
 
   sealed trait FieldEvent extends ActorEvent {
@@ -123,26 +129,36 @@ object Field {
   case class CreatureImmigrated(creature: Creature, x: Int, y: Int) extends FieldEvent
   case class CreatureDied(creature: Creature, x: Int, y: Int) extends FieldEvent
   case class FieldCreated(x: Int, y: Int) extends FieldEvent
+  case class Accosted(attributes: Attributes, sex: Sex, x: Int, y: Int) extends FieldEvent
+  case class AllCreaturesKilled(x: Int, y: Int) extends FieldEvent
 
-  case object GetFieldStatus
+  sealed trait FieldMessage {
+    def coordinates: Coordinates
+  }
 
-  def props(gameMap: ActorRef, sinkActor: ActorRef) = Props(new Field(gameMap, sinkActor))
+  case class GetFieldStatus(coordinates: Coordinates) extends FieldMessage
 
-  def clusterShardingProps(gameMap: ActorRef, sinkActor: ActorRef)(implicit actorSystem: ActorSystem) =
+  def props = Props(new Field)
+
+  def clusterShardingProps(implicit actorSystem: ActorSystem) =
     ClusterSharding(actorSystem).start(
       typeName = "Field",
-      entityProps = props(gameMap, sinkActor),
+      entityProps = props,
       settings = ClusterShardingSettings(actorSystem),
       extractEntityId = extractEntityId,
       extractShardId = extractShardId
     )
 
   private val extractEntityId: ShardRegion.ExtractEntityId = {
-    case a: FieldEvent => (s"${a.x},${a.y}", a)
+    case a: FieldCommand => (s"${a.coordinates.x},${a.coordinates.y}", a)
+    case a: FieldMessage => (s"${a.coordinates.x},${a.coordinates.y}", a)
+    case a: FieldEvent => (s"${a.x}x${a.y}y", a)
   }
 
   private val extractShardId: ShardRegion.ExtractShardId = {
-    case a: FieldEvent => (s"${a.x},${a.y}".hashCode % Config.numberOfShards).toString
+    case a: FieldCommand => (s"${a.coordinates.x},${a.coordinates.y}".hashCode % Config.numberOfShards).toString
+    case a: FieldMessage => (s"${a.coordinates.x},${a.coordinates.y}".hashCode % Config.numberOfShards).toString
+    case a: FieldEvent => (s"${a.x}x${a.y}y".hashCode % Config.numberOfShards).toString
   }
 
 }

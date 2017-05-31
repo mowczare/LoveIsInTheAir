@@ -3,8 +3,8 @@ package pl.mowczarek.love.backend.actors
 import akka.actor.{Actor, ActorRef, ActorSystem, Kill, PoisonPill, Props}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings}
 import pl.mowczarek.love.backend.actors.CreatureManager.KillAllCreatures
-import pl.mowczarek.love.backend.actors.Field.GetFieldStatus
-import pl.mowczarek.love.backend.actors.SystemMap.{GetField, GetMapStatus, GetRandomField}
+import pl.mowczarek.love.backend.actors.Field.{CreateField, GetFieldStatus}
+import pl.mowczarek.love.backend.actors.SystemMap.GetMapStatus
 import pl.mowczarek.love.backend.config.Config
 import pl.mowczarek.love.backend.model.Creature
 
@@ -21,36 +21,37 @@ import scala.concurrent.Future
 /**
   * Created by neo on 22.03.17.
   */
-class SystemMap(sinkActor: ActorRef) extends Actor { // TODO Rewrite to use Field shard paths
+class SystemMap extends Actor {
 
-  private var fieldsMap: Map[Coordinates, ActorRef] = Map()
+  import Paths._
+
+  private var fieldsSet: Set[Coordinates] = Set()
 
   val mapSize = Config.mapSize
 
+  implicit val system = context.system
+
   implicit val timeout: Timeout = 15 seconds
 
-  override def receive: Receive = {
-    case GetRandomField =>
-      fieldsMap.get(Coordinates(Random.nextInt(mapSize)+1, Random.nextInt(mapSize)+1)).foreach { field =>
-        sender ! field
-      }
+  override def preStart = {
+    for {
+      x <- 0 until Config.mapSize
+      y <- 0 until Config.mapSize
+    } yield {
+      context.system.scheduler.scheduleOnce(20 seconds, fieldsPath, CreateField(Coordinates(x,y)))
+      fieldsSet = fieldsSet + Coordinates(x,y)
+    }
+  }
 
-    case GetRandomField(x, y) =>
-      val potentialField = fieldsMap.get(Coordinates(x + Random.nextInt(3)-1, y + Random.nextInt(3)-1))
-      potentialField.orElse(fieldsMap.get(Coordinates(x, y))).foreach(field => sender ! field)
+  override def receive: Receive = {
 
     case KillAllCreatures =>
-      fieldsMap.values.foreach(_ ! KillAllCreatures)
-
-    case GetField(coordinates) =>
-      fieldsMap.get(coordinates).foreach { field =>
-        sender ! field
-      }
+      fieldsSet.foreach(coords => fieldsPath ! Field.KillAllCreatures(coords))
 
     case GetMapStatus =>
       val restSender = sender()
-      val stateFutures = fieldsMap.map { case (coords, field) =>
-        (field ? GetFieldStatus).mapTo[List[Creature]].map(creatures => FieldState(coords, creatures))
+      val stateFutures = fieldsSet.map { coords =>
+        (fieldsPath ? GetFieldStatus(coords)).mapTo[List[Creature]].map(creatures => FieldState(coords, creatures))
       }.toList
       Future.sequence(stateFutures).onComplete {
         case Success(fieldStates) =>
@@ -62,26 +63,31 @@ class SystemMap(sinkActor: ActorRef) extends Actor { // TODO Rewrite to use Fiel
 
 object SystemMap {
 
-  case class GetField(coordinates: Coordinates)
-
-  case object GetRandomField
-
-  case class GetRandomField(x: Int, y: Int)
-
   case object GetMapStatus
 
-  def props(sinkActor: ActorRef): Props = Props(new SystemMap(sinkActor))
+  def props: Props = Props(new SystemMap)
 
-  def clusterSingletonProps(sinkActor: ActorRef)(implicit system: ActorSystem): Props =
+  def clusterSingletonProps(implicit system: ActorSystem): Props =
     ClusterSingletonManager.props(
-    singletonProps = props(sinkActor),
+    singletonProps = props,
     terminationMessage = PoisonPill,
     settings = ClusterSingletonManagerSettings(system))
 }
 
-case class Coordinates(x: Int, y: Int)
-
 case class FieldState(coordinates: Coordinates, creatures: List[Creature])
 
 case class MapState(sizeX: Int, sizeY: Int, states: List[FieldState])
+
+case class Coordinates(x: Int, y: Int) {
+  def neighbours: List[Coordinates] =
+    List(Coordinates(x-1, y-1), Coordinates(x-1, y), Coordinates(x-1, y+1), Coordinates(x, y-1),
+      Coordinates(x, y+1), Coordinates(x+1, y-1), Coordinates(x+1, y), Coordinates(x+1, y+1))
+      .filter(coords => coords.x >= 0 && coords.y >= 0 && coords.y < Config.mapSize && coords.x < Config.mapSize)
+
+  def randomNeighbor: Coordinates = Random.shuffle(neighbours).head
+}
+
+object Coordinates {
+  def random = Coordinates(Random.nextInt(Config.mapSize), Random.nextInt(Config.mapSize))
+}
 

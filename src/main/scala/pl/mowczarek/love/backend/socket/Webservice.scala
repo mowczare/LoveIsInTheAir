@@ -7,7 +7,7 @@ import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.{Directives, Route}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{Materializer, OverflowStrategy}
-import pl.mowczarek.love.backend.actors.{ActorEvent, MapState}
+import pl.mowczarek.love.backend.actors.{ActorEvent, MapState, Paths}
 import pl.mowczarek.love.backend.actors.CreatureManager.{AddCreature, AddRandomCreature, KillAllCreatures}
 import pl.mowczarek.love.backend.actors.SystemMap.GetMapStatus
 import pl.mowczarek.love.backend.config.Config
@@ -16,6 +16,7 @@ import pl.mowczarek.love.backend.socket.DispatcherActor.ClientJoined
 import scala.util.{Failure, Success}
 import akka.pattern.ask
 import akka.util.Timeout
+import pl.mowczarek.love.backend.actors.Paths._
 import upickle.default._
 
 import scala.concurrent.duration._
@@ -24,9 +25,12 @@ import scala.language.postfixOps
 /**
   * Created by neo on 03.04.17.
   */
-class Webservice(sinkActor: ActorRef, creatureManager: ActorRef, systemMap: ActorRef) // TODO implement initialize backend endpoint
-                (implicit fm: Materializer, system: ActorSystem) extends Directives {
+class Webservice(fm: Materializer, system: ActorSystem) extends Directives {
+  // TODO implement initialize backend endpoint
   import system.dispatcher
+
+  implicit val materializer = fm
+  implicit val actorSystem = system
 
   def route: Route =
     path("creature") {
