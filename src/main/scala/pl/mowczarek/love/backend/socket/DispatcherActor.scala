@@ -36,7 +36,7 @@ object DispatcherActor {
     ClusterSingletonManager.props(
       singletonProps = props,
       terminationMessage = PoisonPill,
-      settings = ClusterSingletonManagerSettings(system).withRole("worker"))
+      settings = ClusterSingletonManagerSettings(system))
 
   sealed trait FrontendEvent
   case class ClientJoined(subscriber: ActorRef) extends FrontendEvent

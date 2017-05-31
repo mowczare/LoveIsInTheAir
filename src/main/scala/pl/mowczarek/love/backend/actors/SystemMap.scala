@@ -76,7 +76,7 @@ object SystemMap {
     ClusterSingletonManager.props(
     singletonProps = props(sinkActor),
     terminationMessage = PoisonPill,
-    settings = ClusterSingletonManagerSettings(system).withRole("worker"))
+    settings = ClusterSingletonManagerSettings(system))
 }
 
 case class Coordinates(x: Int, y: Int)

@@ -15,7 +15,7 @@ import scala.util.{Failure, Success}
   * Created by neo on 15.03.17.
   */
 object LoveSystem extends App {
-  implicit val actorSystem = ActorSystem("loveIsInTheAir")
+  implicit val actorSystem = ActorSystem(Config.systemName)
 
   import actorSystem.dispatcher
   implicit val materializer = ActorMaterializer()
