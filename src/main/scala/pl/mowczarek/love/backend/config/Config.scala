@@ -8,6 +8,8 @@ import com.typesafe.config.ConfigFactory
 object Config {
   private val conf = ConfigFactory.load()
 
+  lazy val systemName = conf.getString("loveIsInTheAir.system.name")
+
   lazy val mapSize = conf.getInt("loveIsInTheAir.system.mapSize")
   lazy val creaturesAtStart = conf.getInt("loveIsInTheAir.system.creaturesAtStart")
 
