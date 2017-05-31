@@ -1,7 +1,9 @@
 package pl.mowczarek.love.backend
 
 import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.cluster.Cluster
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
+import akka.cluster.singleton.ClusterSingletonManager
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import pl.mowczarek.love.backend.actors.CreatureManager.StartGame
@@ -15,31 +17,21 @@ import scala.util.{Failure, Success}
   * Created by neo on 15.03.17.
   */
 object LoveSystem extends App {
-  implicit val actorSystem = ActorSystem(Config.systemName)
 
-  import actorSystem.dispatcher
-  implicit val materializer = ActorMaterializer()
+  implicit val actorSystem = ActorSystem(Config.systemName)
 
   val sinkActor: ActorRef = actorSystem.actorOf(DispatcherActor.clusterSingletonProps, "sinkActor")
 
-  val systemMap = actorSystem.actorOf(SystemMap.clusterSingletonProps(sinkActor), "systemMap")
+  val systemMap: ActorRef = actorSystem.actorOf(SystemMap.clusterSingletonProps, "systemMap")
 
-  val fieldsRegion: ActorRef = Field.clusterShardingProps(systemMap, sinkActor)
+  val fieldsRegion: ActorRef = Field.clusterShardingProps
 
-  val creatureManager = actorSystem.actorOf(CreatureManager.props(systemMap)) // TODO Merge with systemMap
-  creatureManager ! StartGame   // TODO send with init in rest
+  val creatureManager = actorSystem.actorOf(CreatureManager.clusterSingletonProps, "creatureManager") // TODO Merge with systemMap
 
-  val service = new Webservice(sinkActor, creatureManager, systemMap) // TODO Move with binding to sinkActor
 
-  val bindingFuture = Http().bindAndHandle(service.route, Config.host, Config.port)
-  bindingFuture.onComplete {
-    case Success(binding) =>
-      val localAddress = binding.localAddress
-      println(s"Server is listening on ${localAddress.getHostName}:${localAddress.getPort}")
-    case Failure(e) =>
-      println(s"Binding failed with ${e.getMessage}")
-      actorSystem.terminate()
-  }
+
+
+  //creatureManager ! StartGame   // TODO send with init in rest
 
 
 }

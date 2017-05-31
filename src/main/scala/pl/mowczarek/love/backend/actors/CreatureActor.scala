@@ -2,7 +2,7 @@ package pl.mowczarek.love.backend.actors
 
 import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Props}
 import pl.mowczarek.love.backend.actors.CreatureActor._
-import pl.mowczarek.love.backend.actors.Field.{Emigrate, MatureCreature, SpawnCreature}
+import pl.mowczarek.love.backend.actors.Field.{Accost, Emigrate, MatureCreature, SpawnCreature}
 import pl.mowczarek.love.backend.model.{Attributes, Creature, Male, Sex}
 import akka.pattern.ask
 import akka.util.Timeout
@@ -15,18 +15,21 @@ import scala.util.{Failure, Random, Success}
 /**
   * Created by neo on 15.03.17.
   */
-class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef) extends Actor
+class CreatureActor(thisCreatureInitialState: Creature, fieldCoordinates: Coordinates) extends Actor
   with ActorLogging {
+
+  import Paths._
 
   implicit val timeout: Timeout = 5 seconds
 
-  private var thisField = field
+  implicit val system = context.system
+
+  private var thisField = fieldCoordinates
   private var thisCreature = thisCreatureInitialState
   private var pairedCreature: Option[Creature] = None
 
   override def preStart = {
     log.info(s"${this.thisCreature} created in baby state")
-    field ! SpawnCreature(thisCreature)
     //TODO move adolescence time and tryToAccost time to config
     context.system.scheduler.scheduleOnce(15 seconds, self, Mature)
     context.system.scheduler.scheduleOnce(Random.nextInt(30)+50 seconds, self, Die)
@@ -41,7 +44,7 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef) extends
       context.system.scheduler.schedule(2 seconds, 2 seconds, self, TryToAccost)
       log.info("Creature is mature now")
       context.become(mature)
-      field ! MatureCreature(thisCreature)
+      fieldsPath ! MatureCreature(thisCreature, thisField)
   }
 
   def mature: Receive = {
@@ -50,9 +53,9 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef) extends
       log.info("Creature is dead")
 
     case TryToAccost =>
-      field ! Accost(thisCreature.attributes, thisCreature.sex)
+      fieldsPath ! Accost(thisCreature.attributes, thisCreature.sex, thisField)
 
-    case Accost(attributes, sex) =>
+    case Accost(attributes, sex, _) =>
       if (thisCreature.isAttractedTo(attributes, sex))
         sender ! Interest(thisCreature)
       else {
@@ -74,7 +77,7 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef) extends
       context.become(postPair)
 
     case Migrate =>
-      (field ? Emigrate(thisCreature)).mapTo[ActorRef].onComplete {
+      (fieldsPath ? Emigrate(thisCreature, thisField)).mapTo[Coordinates].onComplete {
         case Success(ref) => thisField = ref
         case Failure(ex) => throw ex
       }
@@ -99,7 +102,7 @@ class CreatureActor(thisCreatureInitialState: Creature, field: ActorRef) extends
     case Reproduce =>
       pairedCreature.foreach { creature =>
         log.info("Reproducing")
-        context.actorOf(CreatureActor.props(field, thisCreature.mixWith(creature)))
+        context.actorOf(CreatureActor.props(thisField, thisCreature.mixWith(creature)))
       }
       context.system.scheduler.schedule(2 seconds, 2 seconds, self, Copulate)
       context.become(postPair)
@@ -119,7 +122,6 @@ object CreatureActor {
   sealed trait CreatureCommand extends ActorCommand
   case object Mature extends CreatureCommand
   case object TryToAccost extends CreatureCommand
-  case class Accost(attributes: Attributes, sex: Sex) extends CreatureCommand
   case class Interest(otherCreature: Creature) extends CreatureCommand
   case class Match(otherCreature: Creature) extends CreatureCommand
   case object Copulate extends CreatureCommand
@@ -127,7 +129,7 @@ object CreatureActor {
   case object Die extends CreatureCommand
   case object Migrate extends CreatureCommand
 
-  def props(field: ActorRef): Props = props(field, Creature.generate())
-  def props(field: ActorRef, creature: Creature): Props =
+  def props(field: Coordinates): Props = props(field, Creature.generate())
+  def props(field: Coordinates, creature: Creature): Props =
     Props(new CreatureActor(creature, field))
 }
