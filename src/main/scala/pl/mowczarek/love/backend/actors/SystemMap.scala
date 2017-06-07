@@ -38,7 +38,7 @@ class SystemMap extends Actor {
       x <- 0 until Config.mapSize
       y <- 0 until Config.mapSize
     } yield {
-      context.system.scheduler.scheduleOnce(20 seconds, fieldsPath, CreateField(Coordinates(x,y)))
+      context.system.scheduler.scheduleOnce(15 seconds, fieldsPath, CreateField(Coordinates(x,y)))
       fieldsSet = fieldsSet + Coordinates(x,y)
     }
   }

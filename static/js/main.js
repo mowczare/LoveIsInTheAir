@@ -51,10 +51,10 @@ $( document ).ready(function() {
 
     function drawCreature(element, index, array) {
         if(element.xCanvas == -1){
-            element.xCanvas = getRandomInt((canvas.width/sizeX) * (element.x - 1), (canvas.width/sizeX) * element.x - 30);
+            element.xCanvas = getRandomInt((canvas.width/sizeX) * (element.x), (canvas.width/sizeX) * (element.x + 1) - 30);
         }
         if(element.yCanvas == -1){
-            element.yCanvas = getRandomInt((canvas.height/sizeY) * (element.y - 1), (canvas.height/sizeY) * element.y - 30);
+            element.yCanvas = getRandomInt((canvas.height/sizeY) * (element.y), (canvas.height/sizeY) * (element.y + 1) - 30);
         }
         if(element.state == "mature" || element.state == "immigrated") {
             if (element.sex == "male") {
@@ -183,7 +183,7 @@ $( document ).ready(function() {
         var data = JSON.parse(event.data);
         switch(data.$type) {
             case "pl.mowczarek.love.backend.actors.Field.CreatureSpawned":
-                console.log("Creature " + data.creature.id + " spawned.");
+                console.log("Creature " + data.creature.id + " " + data.x + " " + data.y + " spawned.");
                 $("#simulation-logs").prepend("Creature " + data.creature.id + " spawned.<br>");
                 var sex = data.creature.sex.$type.toString().includes(".Male") ? "male" : "female";
                 creatures.push(new Creature(data.creature.id, sex, data.x, data.y, data.creature.state));
