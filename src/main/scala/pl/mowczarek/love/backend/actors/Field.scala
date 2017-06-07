@@ -27,7 +27,7 @@ class Field extends Actor with ActorLogging {
 
   override def receive: Receive = {
     case CreateField(coordinates: Coordinates) =>
-      log.info(s"Field created: x: ${coordinates.x}, y: ${coordinates.y}")
+      log.warning(s"Field created: x: ${coordinates.x}, y: ${coordinates.y}")
       context.become(postCreate(coordinates.x, coordinates.y))
 
     case msg => log.error("Got Field command not in created state: {}", msg)
@@ -37,11 +37,11 @@ class Field extends Actor with ActorLogging {
 
     case KillAllCreatures(_) =>
       creatures.keys.foreach(_ ! Die)
+      creatures = Map()
 
     case c@SpawnCreature(creature, _) =>
       val newCreature = context.actorOf(CreatureActor.props(Coordinates(x, y), creature))
       creatures += newCreature -> creature
-      context.watch(newCreature)
       log.info(s"Creature landed on field ($x, $y)")
       forwardToSocket(write(c.toEvent))
 
@@ -52,37 +52,35 @@ class Field extends Actor with ActorLogging {
 
     case c@Emigrate(creature, coordinates) =>
       val creatureRef = sender
-      creature.state = "emigrated"
-      forwardToSocket(write(c.toEvent))
+      val updatedCreature = creature.copy(state = "emigrated")
+      forwardToSocket(write(c.copy(creature = updatedCreature).toEvent))
       val randomNeighbour = Coordinates(x, y).randomNeighbor
-      creatures -= creatureRef
-      context.unwatch(creatureRef)
+      val toRemove = creatures.filter{case (ref,cr) => cr.id == creature.id}.keys.toSet
+      creatures = creatures.filterKeys(ref => !toRemove.contains(ref))
       log.info(s"Creature left field ($x, $y)")
       creatureRef ! randomNeighbour
-      fieldsPath ! Immigrate(creature, creatureRef, randomNeighbour)
+      fieldsPath ! Immigrate(updatedCreature, creatureRef, randomNeighbour)
 
     case c@Immigrate(creature, creatureRef, _) =>
-      creature.state = "immigrated"
-      creatures += creatureRef -> creature
-      context.watch(creatureRef)
+      val updatedCreature = creature.copy(state = "immigrated")
+      creatures += creatureRef -> updatedCreature
       log.info(s"Creature migrated onto field ($x, $y)")
-      forwardToSocket(write(c.toEvent))
+      forwardToSocket(write(c.copy(creature = updatedCreature).toEvent))
 
     case c@MatureCreature(creature, _) =>
-      creature.state = "mature"
+      val updatedCreature = creature.copy(state = "mature")
       log.info(s"Creature matured on field ($x, $y)")
-      forwardToSocket(write(c.toEvent))
+      forwardToSocket(write(c.copy(creature = updatedCreature).toEvent))
 
     case GetFieldStatus(_) =>
       sender ! creatures.values.toList
 
     //This message comes from context.watch akka mechanism
-    case Terminated(subject: ActorRef) =>
-      creatures.get(subject).foreach { creature =>
-        creature.state = "dead"
-        forwardToSocket(write(CreatureDied(creature, x, y)))
-      }
-      creatures -= subject
+    case c@CreatureDied(creature, _, _) =>
+      log.warning(s"dead $creature in "+x+"  "+y)
+      val toRemove = creatures.filter{case (ref,cr) => cr.id == creature.id}.keys.toSet
+      creatures = creatures.filterKeys(ref => !toRemove.contains(ref))
+      toRemove.headOption.foreach(_ => forwardToSocket(write(c)))
   }
 
 
@@ -152,13 +150,13 @@ object Field {
   private val extractEntityId: ShardRegion.ExtractEntityId = {
     case a: FieldCommand => (s"${a.coordinates.x},${a.coordinates.y}", a)
     case a: FieldMessage => (s"${a.coordinates.x},${a.coordinates.y}", a)
-    case a: FieldEvent => (s"${a.x}x${a.y}y", a)
+    case a: FieldEvent => (s"${a.x},${a.y}", a)
   }
 
   private val extractShardId: ShardRegion.ExtractShardId = {
     case a: FieldCommand => (s"${a.coordinates.x},${a.coordinates.y}".hashCode % Config.numberOfShards).toString
     case a: FieldMessage => (s"${a.coordinates.x},${a.coordinates.y}".hashCode % Config.numberOfShards).toString
-    case a: FieldEvent => (s"${a.x}x${a.y}y".hashCode % Config.numberOfShards).toString
+    case a: FieldEvent => (s"${a.x},${a.y}".hashCode % Config.numberOfShards).toString
   }
 
 }

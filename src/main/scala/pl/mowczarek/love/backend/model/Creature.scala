@@ -13,7 +13,7 @@ case class Creature(attributes: Attributes,
                     sex: Sex,
                     desperation: Double,
                     id: String,
-                    var state: String) {
+                    state: String) {
 
   def isAttractedTo(otherAttributes: Attributes, sex: Sex): Boolean = {
     //Please do not sue me for being homophobic, creatures of the same sex cannot reproduce, it is for simplicity sake.
