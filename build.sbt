@@ -1,3 +1,5 @@
+import sbt.Keys._
+
 name := "LoveIsInTheAir"
 
 version := "1.0"
@@ -30,13 +32,16 @@ val other = Seq(
   "com.lihaoyi" %% "upickle" % "0.4.4"
 )
 
-lazy val love = project in file(".")
+lazy val love = (project in file(".")).
+  settings(
+    name := "my-project",
+    version := "1.1",
+    mainClass in Compile := Some("pl.mowczarek.love.backend.LoveSystem")
+  )
 
 libraryDependencies ++= akka ++ other
 
 fork in run := true
-
-mainClass in Compile := Some("pl.mowczarek.love.backend.LoveSystem")
 
 resourceDirectory in Compile := baseDirectory.value / "conf"
 
