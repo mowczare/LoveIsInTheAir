@@ -1,5 +1,7 @@
 package pl.mowczarek.love.backend.model
 
+import pl.mowczarek.love.backend.config.Config
+
 import scala.language.postfixOps
 import scala.util.Random
 
@@ -15,7 +17,7 @@ case class Attributes(attributes: Map[String, Attribute]) {
     val points = attributes.map { case (name, myAttribute) =>
       otherAttributes.attributes.get(name).map(_.value).getOrElse(0) * myAttribute.importance
     }.sum * desperation
-    points > totalValue
+    points > totalValue * Config.initialFuss
   }
 
   def mixWith(otherAttributes: Attributes): Attributes = {
@@ -32,7 +34,7 @@ case class Attributes(attributes: Map[String, Attribute]) {
 
 object Attributes {
   val names = Seq("a", "b", "c", "d", "e", "f", "g", "h", "i", "j") //todo add real names
-  def random: Attributes = random(10) //todo move 10 to config
+  def random: Attributes = random(10)
   def random(numberOfAttributes: Int) : Attributes = {
     val attributes = (1 to numberOfAttributes).map { _ =>
       val newAttribute = Attribute.random

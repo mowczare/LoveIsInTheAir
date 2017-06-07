@@ -6,6 +6,7 @@ import pl.mowczarek.love.backend.actors.Field._
 import pl.mowczarek.love.backend.model.{Attributes, Creature, Male, Sex}
 import akka.pattern.ask
 import akka.util.Timeout
+import pl.mowczarek.love.backend.config.Config
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -30,19 +31,23 @@ class CreatureActor(thisCreatureInitialState: Creature, fieldCoordinates: Coordi
 
   override def preStart = {
     log.info(s"${this.thisCreature} created in baby state")
-    //TODO move adolescence time and tryToAccost time to config
-    context.system.scheduler.scheduleOnce(10 seconds, self, Mature)
-    context.system.scheduler.scheduleOnce(Random.nextInt(20)+30 seconds, self, Die)
-    context.system.scheduler.schedule(Random.nextInt(15) + 30 seconds, Random.nextInt(15) + 30 seconds, self, Migrate)
+    context.system.scheduler.scheduleOnce(Config.matureTime seconds, self, Mature)
+    context.system.scheduler.scheduleOnce(Random.nextInt(Config.lifeTimeDelta)+ Config.lifeTime seconds, self, Die)
+    context.system.scheduler.schedule(
+      Random.nextInt(Config.firstMigrationTimeDelta) + Config.firstMigrationTime seconds,
+      Random.nextInt(Config.nextMigrationsTimeDelta) + Config.nextMigrationsTime seconds,
+      self, Migrate
+    )
   }
 
   override def receive: Receive = {
     case Die =>
       fieldsPath ! CreatureDied(thisCreature.copy(state = "dead"), thisField.x, thisField.y)
       self ! PoisonPill
-      log.warning("Creature is dead" + thisCreature)
+      log.info("Creature is dead" + thisCreature)
     case Mature =>
-      context.system.scheduler.schedule(2 seconds, 2 seconds, self, TryToAccost)
+      context.system.scheduler.schedule(Config.accostingFrequency seconds, Config.accostingFrequency seconds,
+        self, TryToAccost)
       log.info("Creature is mature now")
       context.become(mature)
       fieldsPath ! MatureCreature(thisCreature, thisField)
@@ -52,7 +57,7 @@ class CreatureActor(thisCreatureInitialState: Creature, fieldCoordinates: Coordi
     case Die =>
       fieldsPath ! CreatureDied(thisCreature.copy(state = "dead"), thisField.x, thisField.y)
       self ! PoisonPill
-      log.warning("Creature is dead" + thisCreature.id)
+      log.info("Creature is dead" + thisCreature.id)
 
 
     case TryToAccost =>
@@ -76,7 +81,8 @@ class CreatureActor(thisCreatureInitialState: Creature, fieldCoordinates: Coordi
     case Match(otherCreature) =>
       log.info(s"Paired creature $thisCreature with $otherCreature")
       pair(otherCreature)
-      context.system.scheduler.schedule(2 seconds, 2 seconds, self, Copulate)
+      context.system.scheduler.schedule(Config.copulationFrequency seconds, Config.copulationFrequency seconds,
+        self, Copulate)
       context.become(postPair)
 
     case Migrate =>
@@ -91,16 +97,16 @@ class CreatureActor(thisCreatureInitialState: Creature, fieldCoordinates: Coordi
     case Copulate =>
       log.info("Trying to copulate")
       //TODO move copulate percentage to config
-      if (Random.nextInt(100) < 5) {
+      if (Random.nextInt(100) < Config.chanceOfReproducingWhileCopulating) {
         log.info("Pair is having a baby")
-        context.system.scheduler.scheduleOnce(1 second, self, Reproduce)
+        context.system.scheduler.scheduleOnce(Config.pregnancyTime seconds, self, Reproduce)
         context.become(pregnant)
       }
 
     case Die =>
       fieldsPath ! CreatureDied(thisCreature.copy(state = "dead"), thisField.x, thisField.y)
       self ! PoisonPill
-      log.warning("Creature is dead" + thisCreature.id)
+      log.info("Creature is dead" + thisCreature.id)
   }
 
   def pregnant: Receive = {
@@ -109,13 +115,14 @@ class CreatureActor(thisCreatureInitialState: Creature, fieldCoordinates: Coordi
         log.info("Reproducing")
         fieldsPath ! SpawnCreature(thisCreature.mixWith(creature), thisField)
       }
-      context.system.scheduler.schedule(2 seconds, 2 seconds, self, Copulate)
+      context.system.scheduler.schedule(Config.copulationFrequency seconds, Config.copulationFrequency seconds,
+        self, Copulate)
       context.become(postPair)
 
     case Die =>
       fieldsPath ! CreatureDied(thisCreature.copy(state = "dead"), thisField.x, thisField.y)
       self ! PoisonPill
-      log.warning("Creature is dead" + thisCreature.id)
+      log.info("Creature is dead" + thisCreature.id)
   }
 
   private def pair(otherCreature: Creature) = {

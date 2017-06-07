@@ -27,7 +27,7 @@ class Field extends Actor with ActorLogging {
 
   override def receive: Receive = {
     case CreateField(coordinates: Coordinates) =>
-      log.warning(s"Field created: x: ${coordinates.x}, y: ${coordinates.y}")
+      log.info(s"Field created: x: ${coordinates.x}, y: ${coordinates.y}")
       context.become(postCreate(coordinates.x, coordinates.y))
 
     case msg => log.error("Got Field command not in created state: {}", msg)
@@ -77,7 +77,6 @@ class Field extends Actor with ActorLogging {
 
     //This message comes from context.watch akka mechanism
     case c@CreatureDied(creature, _, _) =>
-      log.warning(s"dead $creature in "+x+"  "+y)
       val toRemove = creatures.filter{case (ref,cr) => cr.id == creature.id}.keys.toSet
       creatures = creatures.filterKeys(ref => !toRemove.contains(ref))
       toRemove.headOption.foreach(_ => forwardToSocket(write(c)))

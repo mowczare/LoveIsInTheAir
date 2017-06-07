@@ -2,6 +2,8 @@ package pl.mowczarek.love.backend.model
 
 import java.util.UUID
 
+import pl.mowczarek.love.backend.config.Config
+
 import scala.util.Random
 
 /**
@@ -20,7 +22,7 @@ case class Creature(attributes: Attributes,
     this.preferences.areMatchedWith(otherAttributes, desperation) && this.sex != sex
   }
 
-  def increaseDesperation = copy(desperation = this.desperation + 0.1)
+  def increaseDesperation = copy(desperation = this.desperation + Config.desperationIncreaseFactor)
 
   def mixWith(otherCreature: Creature) = {
     Creature.generate(
@@ -34,7 +36,7 @@ object Creature {
   def generate(attributes: Attributes = Attributes.random,
                preferences: Attributes = Attributes.random,
                sex: Sex = Sex.random,
-               desperation: Double = 1.0,
+               desperation: Double = Config.initialDesperation,
                id: String = UUID.randomUUID().toString,
                state: String = "spawned"): Creature = {
     Creature(attributes, preferences, sex, desperation, id, state)
